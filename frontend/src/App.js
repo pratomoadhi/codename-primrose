@@ -1,41 +1,25 @@
-// import logo from './logo.svg';
-// import './App.css';
-
-// function App() {
-//   return (
-//     <div className="App">
-//       <header className="App-header">
-//         <img src={logo} className="App-logo" alt="logo" />
-//         <p>
-//           Edit <code>src/App.js</code> and save to reload.
-//         </p>
-//         <a
-//           className="App-link"
-//           href="https://reactjs.org"
-//           target="_blank"
-//           rel="noopener noreferrer"
-//         >
-//           Learn React
-//         </a>
-//       </header>
-//     </div>
-//   );
-// }
-
-// export default App;
-
 import { useEffect, useState } from "react";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
 import axios from "axios";
 
 function App() {
-  const [employees, setEmployees] = useState([]);
-  const [formData, setFormData] = useState({
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
+  const API_URL = API_BASE_URL + '/employees';
+
+  const initialFormData = {
     name: "",
     email: "",
     position: "",
     department: "",
     salary: ""
-  });
+  };
+
+  const [employees, setEmployees] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState(initialFormData);
 
   useEffect(() => {
     fetchEmployees();
@@ -43,7 +27,7 @@ function App() {
 
   const fetchEmployees = () => {
     axios
-      .get("http://localhost:8000/api/employees/")
+      .get(API_URL)
       .then((res) => setEmployees(res.data))
       .catch((err) => console.error(err));
   };
@@ -52,116 +36,204 @@ function App() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // Open form for editing
+  const handleEdit = (employee) => {
+    setFormData({
+      name: employee.name,
+      email: employee.email,
+      position: employee.position,
+      department: employee.department,
+      salary: employee.salary,
+    });
+    setEditingId(employee.id);
+    setIsEditing(true);
+    setIsModalOpen(true);
+  };
+
+  // Submit form (add or edit)
   const handleSubmit = (e) => {
     e.preventDefault();
-    axios
-      .post("http://localhost:8000/api/employees/", {
-        ...formData,
-        salary: parseFloat(formData.salary),
-      })
+    const payload = {
+      ...formData,
+      salary: parseFloat(formData.salary),
+    };
+
+    const request = editingId
+      ? axios.put(`${API_URL}/${editingId}/`, payload)
+      : axios.post(API_URL, payload);
+
+    request
       .then(() => {
         fetchEmployees();
-        setFormData({
-          name: "",
-          email: "",
-          position: "",
-          department: "",
-          salary: "",
-        });
+        setFormData(initialFormData);
+        setIsEditing(false);
+        setEditingId(null);
+        setIsModalOpen(false);
       })
       .catch((err) => console.error(err));
   };
 
+  const handleDelete = (id) => {
+    if (window.confirm("Are you sure you want to delete this employee?")) {
+      axios
+        .delete(`${API_URL}/${id}/`)
+        .then(() => fetchEmployees())
+        .catch((err) => console.error(err));
+    }
+  };
+
+  // Filter employees before rendering
+  const filteredEmployees = employees.filter((emp) =>
+    `${emp.name} ${emp.email}`.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-10 px-4">
-      <h1 className="text-4xl font-bold text-blue-700 mb-8">Employee Manager</h1>
+      <h1 className="text-4xl font-bold text-blue-700 mb-8">Employee Management</h1>
 
-      {/* Form */}
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-3xl bg-white p-6 rounded-xl shadow-md space-y-4"
-      >
-        <h2 className="text-2xl font-semibold mb-2 text-gray-700">Add Employee</h2>
+      <div className="w-full max-w-5xl flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+        {/* Search Input */}
+        <input
+          type="text"
+          placeholder="Search by name or email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="p-2 border border-gray-300 rounded-md w-full md:w-1/2 focus:ring-2 focus:ring-blue-400 outline-none"
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            name="name"
-            placeholder="Name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-            className="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 outline-none"
-          />
-          <input
-            name="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            className="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 outline-none"
-          />
-          <input
-            name="position"
-            placeholder="Position"
-            value={formData.position}
-            onChange={handleChange}
-            required
-            className="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 outline-none"
-          />
-          <input
-            name="department"
-            placeholder="Department"
-            value={formData.department}
-            onChange={handleChange}
-            required
-            className="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 outline-none"
-          />
-          <input
-            name="salary"
-            placeholder="Salary"
-            value={formData.salary}
-            onChange={handleChange}
-            type="number"
-            required
-            className="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 outline-none"
-          />
-        </div>
-
+        {/* Add Employee Button */}
         <button
-          type="submit"
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition w-full md:w-auto"
+          onClick={() => {
+            setFormData(initialFormData);
+            setEditingId(null);
+            setIsEditing(false);
+            setIsModalOpen(true);
+          }}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 w-full md:w-auto"
         >
-          Add Employee
+          + Employee
         </button>
-      </form>
+      </div>
 
-      {/* Employee List */}
-      <div className="w-full max-w-3xl mt-8 bg-white shadow-md rounded-xl p-6">
-        <h2 className="text-2xl font-semibold mb-4 text-gray-700">Employee List</h2>
+      {/* Employee Table */}
+      <div className="w-full max-w-5xl bg-white shadow-md rounded-xl overflow-hidden">
         {employees.length === 0 ? (
-          <p className="text-gray-500 italic">No employees yet.</p>
+          <div className="p-6 text-gray-500 italic">No employees yet.</div>
         ) : (
-          <ul className="divide-y divide-gray-200">
-            {employees.map((emp) => (
-              <li
-                key={emp.id}
-                className="py-3 flex flex-col md:flex-row justify-between items-start md:items-center"
-              >
-                <div>
-                  <p className="font-medium text-gray-800">{emp.name}</p>
-                  <p className="text-sm text-gray-500">{emp.position} — {emp.department}</p>
-                </div>
-                <div className="text-sm text-green-600 mt-2 md:mt-0">
-                  ${emp.salary.toLocaleString()}
-                </div>
-              </li>
-            ))}
-          </ul>
+          <table className="min-w-full table-auto">
+            <thead className="bg-blue-100 text-left text-gray-700">
+              <tr>
+                <th className="px-6 py-3">Name</th>
+                <th className="px-6 py-3">Email</th>
+                <th className="px-6 py-3">Position</th>
+                <th className="px-6 py-3">Department</th>
+                <th className="px-6 py-3">Salary</th>
+                <th className="px-6 py-3">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEmployees.map((emp) => (
+                <tr key={emp.id} className="border-t hover:bg-gray-50">
+                  <td className="px-6 py-3">{emp.name}</td>
+                  <td className="px-6 py-3">{emp.email}</td>
+                  <td className="px-6 py-3">{emp.position}</td>
+                  <td className="px-6 py-3">{emp.department}</td>
+                  <td className="px-6 py-3 text-green-600">${emp.salary.toLocaleString()}</td>
+                  <td className="px-6 py-3">
+                    <div className="flex items-center gap-3 mt-2 md:mt-0">
+                      <button
+                        onClick={() => handleEdit(emp)}
+                        className="text-blue-600 hover:text-blue-800 transition"
+                        title="Edit"
+                      >
+                        <FiEdit size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(emp.id)}
+                        className="text-red-600 hover:text-red-800 transition"
+                        title="Delete"
+                      >
+                        <FiTrash2 size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
+
+      {/* Modal Form */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl shadow-lg relative">
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="absolute top-3 right-4 text-gray-600 hover:text-black text-xl"
+            >
+              &times;
+            </button>
+
+            <h2 className="text-2xl font-semibold mb-4 text-gray-700">Add Employee</h2>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  name="name"
+                  placeholder="Name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  className="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+                <input
+                  name="email"
+                  placeholder="Email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  className="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+                <input
+                  name="position"
+                  placeholder="Position"
+                  value={formData.position}
+                  onChange={handleChange}
+                  required
+                  className="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+                <input
+                  name="department"
+                  placeholder="Department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  required
+                  className="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+                <input
+                  name="salary"
+                  placeholder="Salary"
+                  value={formData.salary}
+                  onChange={handleChange}
+                  type="number"
+                  required
+                  className="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+              >
+                Submit
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default App;
-
